@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 ballban
+#
+# Chinese, Japanese, Korean and English from the same Latin keys, without switching modes.
+# rime-ice (Chinese pinyin and English) is included as it is and rime-jaroomaji (Japanese romaji) is mounted as an
+# extra translator, so updating either means moving its pin in tools/fetch_deps.py, not merging a fork.
+
+__include: rime_ice.schema:/
+
+schema:
+  schema_id: ballban
+  name: Ballban CJK
+  version: "0.1.0"
+  author:
+    - ballban
+  description: |
+    Chinese, Japanese, Korean and English without switching.
+    Based on rime-ice and rime-jaroomaji.
+  dependencies:
+    - melt_eng        # rime-ice English
+    - radical_pinyin  # rime-ice radical lookup
+    - jaroomaji       # builds jaroomaji.prism.bin with jaroomaji's own romaji spelling rules
+
+__patch:
+  - engine/translators/+:
+      - script_translator@japanese
+    # Before rime-ice's uniquifier (the last filter), so that when Chinese and Japanese offer the same text the copy
+    # from the language chosen first is kept.
+    engine/filters/@before last: lua_filter@*ballban_language
+  # A root __patch turns off Rime's automatic ballban.custom.yaml patch, so apply it explicitly.
+  - ballban.custom:/patch?
+
+ballban_language:
+  debug: false  # true appends [zh] / [ja] / [ko] / [en] to every candidate comment
+
+# Japanese romaji, from rime-jaroomaji.
+japanese:
+  dictionary: jaroomaji
+  enable_user_dict: true
+  enable_completion: false
+  initial_quality: 1.0
+  preedit_format:
+    __include: jaroomaji.schema:/translator/preedit_format

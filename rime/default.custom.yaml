@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 ballban
+#
+# Lists the ballban schema first. rime_ice and jaroomaji stay available as fallbacks in the schema menu.
+patch:
+  schema_list:
+    - schema: ballban
+    - schema: rime_ice
+    - schema: jaroomaji

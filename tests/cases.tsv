@@ -1,0 +1,52 @@
+# Expected results of the ballban schema, checked by tests/test_cases.py against the real librime.
+#
+# keys	expected	check
+#
+# keys use librime's key sequence syntax: letters, {space}, {Return}, {Shift+...}.
+# check:
+#   first   (default) the first candidate is expected
+#   page    expected is on the first page (5 candidates)
+#   commit  the keys commit expected
+#   gap     known miss: expected should be first but is not yet. The test fails once it passes, so move it to first.
+
+# Chinese (rime-ice)
+nihao	你好
+zhongguo	中国
+xiawu	下午
+women	我们
+shijie	世界
+# A trailing initial abbreviates the next syllable.
+zhongg	中国
+nihao{space}	你好	commit
+
+# Japanese (rime-jaroomaji). Like Mozc, "nn" is ん, so こんにちは is konnnichiha; konnichiha reads こんいちは.
+konnnichiha	こんにちは
+gakkou	学校
+arigatou	ありがとう
+kolhil	コーヒー
+ralmen	ラーメン
+watashi	私	page
+sakura	桜	page
+konnnichiha{space}	こんにちは	commit
+# jaroomaji ranks 教派 (きょうは) above 今日は on its own, with no learning yet.
+kyouha	今日は	gap
+kyouhaiitenki	今日はいい天気	gap
+
+# Korean (Dubeolsik)
+gksrmf	한글
+dkssudgktpdy	안녕하세요
+rkskek	가나다
+tkfkd	사랑
+Rk	까
+gksr	한ㄱ
+gksrmf{space}	한글	commit
+# Keys that also spell pinyin stay Chinese first, with the Korean reading on the first page.
+an	무	page
+du	여	page
+
+# English (rime-ice melt_eng)
+hello	hello
+google	Google
+
+# rime-ice's v symbols pass through the language filter untouched.
+vfh	©
