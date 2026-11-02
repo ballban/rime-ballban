@@ -5,11 +5,11 @@
 
   deps/rime-ice        iDvel/rime-ice (GPL-3.0): Chinese pinyin and English schemas, dictionaries and Lua
   deps/rime-jaroomaji  lazyfoxchan/rime-jaroomaji (Apache-2.0): Japanese romaji schema and dictionaries
-  deps/librime         librime release build (BSD-3-Clause) with librime-lua built in; only the tests use it
+  deps/librime         librime build (BSD-3-Clause) with librime-lua and librime-octagram built in; only the tests use it
 
 Git repositories are fetched at a fixed commit, which also verifies their content. The librime archive is
-checked by SHA-256. Linux has no librime release build: install the distribution's librime with librime-lua
-and point RIME_LIB at librime.so.1 instead.
+checked by SHA-256. Linux has no librime release build: install the distribution's librime with librime-lua and
+librime-octagram and point RIME_LIB at librime.so.1 instead.
 
     python tools/fetch_deps.py
 """
@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -32,10 +33,13 @@ REPOS = {
     "rime-jaroomaji": ("https://github.com/lazyfoxchan/rime-jaroomaji", "b743307c0251f388976662ee2f9e267043785116"),
 }
 
-LIBRIME_TAG = "1.17.0"
+# Japanese grammar keys need librime-octagram c030e30 or later, which no librime release has yet (1.17.0 predates it).
+# The rolling "latest" prerelease replaces its archives on every librime push; when the download fails, pin the
+# current ones from https://github.com/rime/librime/releases/tag/latest.
+LIBRIME_TAG = "latest"
 LIBRIME_ASSETS = {
-    "Windows": ("rime-33e7814-Windows-msvc-x64.7z", "7478c7caa4ff6b37de86daba1f7ce4a994a4f5ba24872a820fb2b3a9b01fed15"),
-    "Darwin": ("rime-33e7814-macOS-universal.tar.bz2", "11d8dc663c6ec06d5ccb6111ba664a9e7b631b703ac6acd07cffbac664021850"),
+    "Windows": ("rime-56737cd-Windows-msvc-x64.7z", "612e5b38dec5cbf4669e20f43773fd265d6c3490041cca9e77885513aca75da0"),
+    "Darwin": ("rime-56737cd-macOS-universal.tar.bz2", "490b4fc29616eac76f04ef7d5b8a566812f4b31147098315fae8904814941734"),
 }
 
 
@@ -78,7 +82,7 @@ def fetch_librime() -> None:
     target = DEPS / "librime"
     stamp = target / ".asset"
     if stamp.is_file() and stamp.read_text(encoding="utf-8").strip() == name:
-        print(f"librime: {LIBRIME_TAG} (up to date)")
+        print(f"librime: {name} (up to date)")
         return
 
     downloads = DEPS / ".downloads"
@@ -88,7 +92,10 @@ def fetch_librime() -> None:
         url = f"https://github.com/rime/librime/releases/download/{LIBRIME_TAG}/{name}"
         print(f"librime: downloading {url}")
         partial = archive.with_suffix(archive.suffix + ".part")
-        urllib.request.urlretrieve(url, partial)
+        try:
+            urllib.request.urlretrieve(url, partial)
+        except urllib.error.HTTPError as error:
+            sys.exit(f"librime: {url} failed ({error}); pin the current archives in LIBRIME_ASSETS")
         actual = sha256(partial)
         if actual != expected:
             partial.unlink()
@@ -106,7 +113,7 @@ def fetch_librime() -> None:
         with tarfile.open(archive) as bundle:
             bundle.extractall(target, filter="data")
     stamp.write_text(name + "\n", encoding="utf-8")
-    print(f"librime: {LIBRIME_TAG} extracted to {target.relative_to(ROOT)}")
+    print(f"librime: {name} extracted to {target.relative_to(ROOT)}")
 
 
 def main() -> None:

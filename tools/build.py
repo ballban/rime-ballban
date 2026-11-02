@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 ballban
-"""Assemble build/rime: a complete Rime user folder made of rime-ice, rime-jaroomaji and this repository's rime/.
+"""Assemble build/rime: a complete Rime user folder made of rime-ice, rime-jaroomaji, this repository's rime/ and
+the grammar model, with jaroomaji's dictionary weights rewritten from models/jaroomaji-lm.tsv.gz.
 
 Copy the contents of build/rime into a Rime frontend's user folder (Weasel: %APPDATA%\\Rime, Squirrel: ~/Library/Rime,
 fcitx5-rime: ~/.local/share/fcitx5/rime, Trime: /sdcard/rime) and deploy.
@@ -14,8 +15,11 @@ import shutil
 import sys
 from pathlib import Path
 
+import jaroomaji_weights
+
 ROOT = Path(__file__).resolve().parent.parent
 DEPS = ROOT / "deps"
+MODELS = ROOT / "models"
 OUT = ROOT / "build" / "rime"
 
 # Repository files of rime-ice that are not Rime data.
@@ -57,7 +61,10 @@ def main() -> None:
             sys.exit(f"{relative} comes from both {owner[relative]} and rime-jaroomaji")
         owner[relative] = "rime-jaroomaji"
         shutil.copy(item, OUT / item.name)
+    jaroomaji_weights.reweight(OUT, MODELS / "jaroomaji-lm.tsv.gz")
     copy_tree(ROOT / "rime", OUT, owner=owner, name="rime-ballban")
+    # The schema's grammar/language names this file.
+    shutil.copy(MODELS / "ballban.gram", OUT / "ballban.gram")
 
     licenses = OUT / "licenses"
     licenses.mkdir()

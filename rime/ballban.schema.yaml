@@ -10,7 +10,7 @@ __include: rime_ice.schema:/
 schema:
   schema_id: ballban
   name: Ballban CJK
-  version: "0.1.0"
+  version: "0.2.0"
   author:
     - ballban
   description: |
@@ -27,17 +27,32 @@ __patch:
     # Before rime-ice's uniquifier (the last filter), so that when Chinese and Japanese offer the same text the copy
     # from the language chosen first is kept.
     engine/filters/@before last: lua_filter@*ballban_language
+    # Sentences are built from the first max_homophones words of each reading. The default of 1 leaves the grammar
+    # nothing to choose; 8 measured best for Chinese.
+    translator/max_homophones: 8
   # A root __patch turns off Rime's automatic ballban.custom.yaml patch, so apply it explicitly.
   - ballban.custom:/patch?
+
+# One word 3-gram grammar for both Chinese and Japanese (models/ballban.gram), used by librime-octagram. Rime shares
+# the grammar between all translators of a schema. A key stores exp(PMI + 30), so a word whose context matches a key
+# scores PMI + 3 more than one without (collocation -40.8 + 30 against non-collocation -13.8).
+grammar:
+  language: ballban
+  collocation_max_length: 9
+  collocation_min_length: 1
+  collocation_penalty: -40.815510557964274
+  weak_collocation_penalty: -40.815510557964274
+  non_collocation_penalty: -13.815510557964274
 
 ballban_language:
   debug: false  # true appends [zh] / [ja] / [ko] / [en] to every candidate comment
 
-# Japanese romaji, from rime-jaroomaji.
+# Japanese romaji, from rime-jaroomaji. tools/build.py rewrites jaroomaji's weights for the grammar.
 japanese:
   dictionary: jaroomaji
   enable_user_dict: true
   enable_completion: false
   initial_quality: 1.0
+  max_homophones: 10
   preedit_format:
     __include: jaroomaji.schema:/translator/preedit_format

@@ -28,9 +28,18 @@ ralmen	ラーメン
 watashi	私	page
 sakura	桜	page
 konnnichiha{space}	こんにちは	commit
-# jaroomaji ranks 教派 (きょうは) above 今日は on its own, with no learning yet.
+# 教派 (きょうは) still outranks 今日は, and the grammar picks 橋はいい天気 for the sentence.
 kyouha	今日は	gap
 kyouhaiitenki	今日はいい天気	gap
+
+# Sentences the grammar model (models/ballban.gram) gets right and v0.1.0 did not.
+koshigaitaiyo	腰が痛いよ
+ashitahahimadakara	明日は暇だから
+shashinnwototteita	写真を撮っていた
+watashihanihonnniikitai	私は日本に行きたい
+woxiangyaobeikafei	我想要杯咖啡
+zhaopianshitapaide	照片是他拍的
+wobazaigongchanggongzuo	我爸在工厂工作
 
 # Korean (Dubeolsik)
 gksrmf	한글
