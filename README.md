@@ -48,6 +48,8 @@ pinned to fixed commits and assembled at build time; nothing is forked:
 | `tools/jaroomaji_weights.py`    | Rewrites jaroomaji's dictionary weights from `models/jaroomaji-lm.tsv.gz`   |
 | `tools/try.py`                  | Prints the candidates for typed keys through librime, without a frontend    |
 | `tools/rime_api.py`             | Small ctypes binding to librime used by `try.py` and the tests              |
+| `tools/evaluate.py`             | Isolated sentence evaluation with per-case results and resource hashes     |
+| `tools/quantize_grammar.cc`      | Optional offline score quantizer; reads an existing `.gram` directly       |
 | `tests/`                        | Lua unit tests and end-to-end cases (`tests/cases.tsv`)                     |
 
 ## Build
@@ -189,6 +191,64 @@ sentence. The dev sets were used for tuning; the test sets only for this table.
 The dev sets have 300 sentences per language and the test sets 500. A less pruned model (146 MB) scored 66.6% and
 67.8% on the test sets. The training scripts and the evaluation sets are not in this repository yet.
 
+### Compression and decoder experiments
+
+Experiments on 2026-11-03 reproduced the existing baseline with the pinned Windows librime. The development sets
+were used first, then the existing test sets were evaluated. These are not new, independently collected test data.
+**The shipped model and decoder settings have not been changed.**
+
+Quantizing the stored log scores to steps of 0.05 nats preserves all 2,835,227 encoded keys, with at most 0.025 nats
+of error per stored score. Rebuilding the Darts trie lets more suffixes share storage: the file shrinks from
+42,251,308 to 27,616,300 bytes (40.29 to 26.34 MiB, **34.6% smaller**). This is lossy score quantization, not
+lossless compression, and not n-gram pruning.
+
+| Experiment                         | Chinese dev | Japanese dev | Chinese test | Japanese test |
+| ---------------------------------- | ----------: | -----------: | -----------: | ------------: |
+| Current model, Japanese search 10  | 63.0%       | 60.0%        | 63.2%        | 65.6%         |
+| Quantized, Japanese search 10      | 63.0%       | 60.0%        | 63.2%        | 65.2%         |
+| Quantized, Japanese search 20      | 63.0%       | 61.0%        | 63.2%        | 65.6%         |
+| Grammar disabled, existing weights | 60.3%      | 28.0%        |              |               |
+
+Search 20 means `japanese/max_homophones: 20`. The combined candidate keeps the aggregate test exact-match rates,
+but Chinese character accuracy falls from 91.25% to 91.15%, and Japanese from 90.34% to 90.33%. Its Japanese
+test outputs fix four previously incorrect sentences and lose four previously exact matches. The compression-only
+ablation was run afterward to separate the two effects, not to choose another setting using the test set.
+These results do **not** establish an accuracy improvement or lossless behavior.
+
+As a separate reference, Ubuntu Mozc `2.28.4715.102+dfsg-2.2build7`, with an isolated home and no committed input,
+scored 69.67% Japanese dev exact match and 66.6% test exact match; test character accuracy was 93.89%.
+Mozc uses its own full Japanese decoder and language resources, not just jaroomaji's exported dictionary.
+It is not a drop-in Rime schema or a demonstrated smaller cross-platform replacement. Exact match also penalizes
+acceptable spelling variants; character accuracy and manually reviewed alternatives are needed alongside it.
+
+The optional quantizer requires C++17 and
+[darts-clone at 87b71af](https://github.com/s-yata/darts-clone/tree/87b71afd6cf784953e3c08f24c64203397f3b724).
+It needs no training corpus, does not alter the input file, refuses existing output paths, and verifies every
+rebuilt key/value. It supports the little-endian `Rime::Grammar/1.0` layout used by this model. It was exercised
+with GCC 13.3 under WSL; MSVC builds remain unverified. From a Visual Studio Developer PowerShell:
+
+```powershell
+git clone --no-checkout https://github.com/s-yata/darts-clone deps\darts-clone
+git -C deps\darts-clone checkout --detach 87b71afd6cf784953e3c08f24c64203397f3b724
+New-Item -ItemType Directory -Force build\tools | Out-Null
+cl /nologo /std:c++17 /EHsc /O2 /I deps\darts-clone\include tools\quantize_grammar.cc /Fo:build\tools\quantize_grammar.obj /Fe:build\tools\quantize_grammar.exe
+.\build\tools\quantize_grammar.exe models\ballban.gram build\ballban-q05.gram 0.05
+.\.venv\Scripts\python.exe -m unittest discover -s tests -p test_grammar.py
+```
+
+To evaluate a candidate, place it in a separate assembled Rime folder and point that folder's
+`grammar/language` at its file stem. Do not overwrite the shipped model or a frontend's live user folder.
+Evaluation TSVs need `id`, `expected`, and `keys_rime` columns; they are not bundled:
+
+```powershell
+.\.venv\Scripts\python.exe tools\evaluate.py --shared build\candidate --set zh-dev.tsv --set ja-dev.tsv --out build\candidate-results.json
+```
+
+The evaluator uses a temporary user folder, never commits input, and records candidates, exact match, top-five
+recall, mean normalized character accuracy, and hashes of the datasets, library, models and compiled resources.
+Timing is for typing an entire input and fetching candidates, not per-key latency or frontend responsiveness.
+The native quantizer tests run only when its executable is present in `build\tools`.
+
 ## Known limitations
 
 - Keys that are valid pinyin and valid romaji (`hashi`, `kani`, `sushi`) follow Rime's ranking, which puts Chinese
@@ -201,6 +261,12 @@ The dev sets have 300 sentences per language and the test sets 500. A less prune
 - jaroomaji's dictionaries (91 MB of source, 67 MB compiled) and the grammar (40 MB) are large, which may matter on
   phones.
 - iOS frontends have not been checked for librime-lua or librime-octagram support.
+- rime-ice's filters run before language routing and are shared by all translators. Emoji expansion already affects
+  Japanese words; Chinese script conversion is not language-isolated. The isolated test deployment lacks `s2t.json`,
+  so the actual Japanese output with traditionalization enabled remains unverified.
+- Cross-platform source compatibility does not guarantee frontend compatibility or acceptable memory use.
+  The measured compiled Japanese and Chinese tables alone are 70.39 MB and 60.66 MB; model file size is not
+  resident memory. Mobile keyboard layout, plugin versions, deployment, memory and per-key latency need device tests.
 
 ## License
 
